@@ -7,34 +7,92 @@ from cocotb.triggers import ClockCycles
 
 
 @cocotb.test()
-async def test_project(dut):
-    dut._log.info("Start")
+async def test_alu(dut):
+    dut._log.info("Starting ALU test")
 
-    # Set the clock period to 10 us (100 KHz)
+    # Create clock (required by TinyTapeout framework)
     clock = Clock(dut.clk, 10, unit="us")
     cocotb.start_soon(clock.start())
 
-    # Reset
+    # Reset sequence
     dut._log.info("Reset")
     dut.ena.value = 1
     dut.ui_in.value = 0
     dut.uio_in.value = 0
     dut.rst_n.value = 0
-    await ClockCycles(dut.clk, 10)
+    await ClockCycles(dut.clk, 5)
     dut.rst_n.value = 1
-
-    dut._log.info("Test project behavior")
-
-    # Set the input values you want to test
-    dut.ui_in.value = 20
-    dut.uio_in.value = 30
-
-    # Wait for one clock cycle to see the output values
     await ClockCycles(dut.clk, 1)
 
-    # The following assersion is just an example of how to check the output values.
-    # Change it to match the actual expected output of your module:
-    assert dut.uo_out.value == 50
+    # -------------------------
+    # TEST 1: ADD (A=3, B=1)
+    # opcode = 000
+    # -------------------------
+    A = 3
+    B = 1
+    opcode = 0b000
 
-    # Keep testing the module by changing the input values, waiting for
-    # one or more clock cycles, and asserting the expected output values.
+    ui_in = (opcode << 5) | (B << 4) | A
+    dut.ui_in.value = ui_in
+
+    await ClockCycles(dut.clk, 1)
+
+    result = int(dut.uo_out.value) & 0xF
+    carry  = (int(dut.uo_out.value) >> 4) & 0x1
+
+    dut._log.info(f"ADD Result={result}, Carry={carry}")
+    assert result == 4
+    assert carry == 0
+
+    # -------------------------
+    # TEST 2: SUB (A=5, B=1)
+    # opcode = 001
+    # -------------------------
+    A = 5
+    B = 1
+    opcode = 0b001
+
+    ui_in = (opcode << 5) | (B << 4) | A
+    dut.ui_in.value = ui_in
+
+    await ClockCycles(dut.clk, 1)
+
+    result = int(dut.uo_out.value) & 0xF
+    dut._log.info(f"SUB Result={result}")
+    assert result == 4
+
+    # -------------------------
+    # TEST 3: AND (A=6, B=1)
+    # opcode = 010
+    # -------------------------
+    A = 6
+    B = 1
+    opcode = 0b010
+
+    ui_in = (opcode << 5) | (B << 4) | A
+    dut.ui_in.value = ui_in
+
+    await ClockCycles(dut.clk, 1)
+
+    result = int(dut.uo_out.value) & 0xF
+    dut._log.info(f"AND Result={result}")
+    assert result == (A & B)
+
+    # -------------------------
+    # TEST 4: ZERO FLAG CHECK
+    # A=0, B=0, ADD
+    # -------------------------
+    A = 0
+    B = 0
+    opcode = 0b000
+
+    ui_in = (opcode << 5) | (B << 4) | A
+    dut.ui_in.value = ui_in
+
+    await ClockCycles(dut.clk, 1)
+
+    zero = (int(dut.uo_out.value) >> 5) & 0x1
+    dut._log.info(f"ZERO flag={zero}")
+    assert zero == 1
+
+    dut._log.info("ALU test PASSED ✅")

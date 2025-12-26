@@ -1,27 +1,44 @@
-/*
- * Copyright (c) 2024 Your Name
- * SPDX-License-Identifier: Apache-2.0
- */
-
-`default_nettype none
-
-module tt_um_example (
-    input  wire [7:0] ui_in,    // Dedicated inputs
-    output wire [7:0] uo_out,   // Dedicated outputs
-    input  wire [7:0] uio_in,   // IOs: Input path
-    output wire [7:0] uio_out,  // IOs: Output path
-    output wire [7:0] uio_oe,   // IOs: Enable path (active high: 0=input, 1=output)
-    input  wire       ena,      // always 1 when the design is powered, so you can ignore it
-    input  wire       clk,      // clock
-    input  wire       rst_n     // reset_n - low to reset
+module tt_um_alu_4bit (
+    input  wire [7:0] ui_in,
+    output wire [7:0] uo_out,
+    input  wire       clk,
+    input  wire       rst_n
 );
 
-  // All output pins must be assigned. If not used, assign to 0.
-  assign uo_out  = ui_in + uio_in;  // Example: ou_out is the sum of ui_in and uio_in
-  assign uio_out = 0;
-  assign uio_oe  = 0;
+    wire [3:0] A;
+    wire [3:0] B;
+    wire [2:0] opcode;
 
-  // List all unused inputs to prevent warnings
-  wire _unused = &{ena, clk, rst_n, 1'b0};
+    assign A      = ui_in[3:0];
+    assign opcode = ui_in[7:5];
+    assign B      = {3'b000, ui_in[4]};
+
+    reg  [4:0] result_ext;
+    wire [3:0] result;
+    wire carry;
+    wire zero;
+
+    always @(*) begin
+        case (opcode)
+            3'b000: result_ext = A + B;
+            3'b001: result_ext = A - B;
+            3'b010: result_ext = {1'b0, A & B};
+            3'b011: result_ext = {1'b0, A | B};
+            3'b100: result_ext = {1'b0, A ^ B};
+            3'b101: result_ext = {1'b0, ~A};
+            3'b110: result_ext = {1'b0, A << 1};
+            3'b111: result_ext = {1'b0, A >> 1};
+            default: result_ext = 5'b00000;
+        endcase
+    end
+
+    assign result = result_ext[3:0];
+    assign carry  = result_ext[4];
+    assign zero   = (result == 4'b0000);
+
+    assign uo_out[3:0] = result;
+    assign uo_out[4]   = carry;
+    assign uo_out[5]   = zero;
+    assign uo_out[7:6] = 2'b00;
 
 endmodule
